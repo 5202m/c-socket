@@ -1,0 +1,77 @@
+'use static';
+const cluster = require('cluster'),
+    net = require('net');
+
+//获取启动参数 端口
+const port = process.argv[2] || 4000;
+//是否开启单机集群模式
+const isCluster = process.argv[3] || 1;
+//获取核心数
+const num_processes = 1//process.argv[4] || require('os').cpus().length;
+
+//单机集群
+if(isCluster == 1){
+    if (cluster.isMaster) {
+        //工作节点
+        let workers = [];
+        let spawn = function(i) {
+            //启动
+            workers[i] = cluster.fork();
+            //节点退出
+            workers[i].on('exit', (worker, code, signal)=>{
+                //重新启动
+                spawn(i);
+                console.log("00010101101")
+            });
+        };
+        //启动节点
+        for (let i = 0; i < num_processes; i++) {
+            spawn(i);
+        }
+        //根据ip返回对应处理节点
+        let worker_index = function(ip, len) {
+            let s = '';
+            for (let i = 0, _len = ip.length; i < _len; i++) {
+                if (!isNaN(ip[i])) {
+                    s += ip[i];
+                }
+            }
+            let index = Number(s) % len; //Number(s)
+            return index;
+        };
+        //监听请求时 自动分配至对应工作节点上处理
+        let server = net.createServer({ pauseOnConnect: true }, (connection)=> {
+            let worker = workers[worker_index(connection.remoteAddress, num_processes)];
+            worker.send('sticky-session:connection', connection);
+        }).listen(port);
+
+        console.log("cluster start port:"+port);
+    }else{
+        var server = init().listen(0, 'localhost');
+        //监听到消息
+        process.on('message', (message, connection)=> {
+            if (message !== 'sticky-session:connection') {
+                return;
+            }
+            server.emit('connection', connection);
+            connection.resume();
+        });
+        process.on('uncaughtException', (err)=> {
+            console.error("this is some error,please check:", err);
+        });
+    }
+}else{
+    let http = init();
+    let server = http.listen(port, ()=>{
+        console.log("single start port:"+port);
+    });
+}
+
+function init(){
+    let app = require('../app');
+    let http = require('http');
+    http.globalAgent.maxSockets = Infinity;
+    let server = http.Server(app);
+    require("../socket/SocketServer").start(server);
+    return server;
+}

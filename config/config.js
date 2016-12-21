@@ -1,4 +1,4 @@
-'use static';
+'use strict';
 const events = require("events");
 module.exports = {
     namespace: {

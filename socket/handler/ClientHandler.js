@@ -1,7 +1,7 @@
 /**
  * Created by kirk on 2016/12/7.
  */
-'use static';
+'use strict';
 const config=require('../../config/config');
 const request = require('request');
 /*****

@@ -1,4 +1,4 @@
-'use static';
+'use strict';
 const config=require('../../config/config');
 const msgpack = require('msgpack-js');
 /****

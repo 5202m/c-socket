@@ -1,4 +1,4 @@
-'use static';
+'use strict';
 let router =  require('express').Router();
 let serverHandler = require("../socket/handler/ServerHandler");
 const storageService = require("../service/StorageService");

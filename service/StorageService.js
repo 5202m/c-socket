@@ -1,7 +1,7 @@
-'use static';
+'use strict';
 const config=require('../config/config');
 const redis = require("redis");
-const Q = require("Q");
+const Q = require("q");
 class StorageService{
     constructor(){
         this.redisClient = redis.createClient({host:config.redis.host, port:config.redis.port} );

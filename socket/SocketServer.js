@@ -1,4 +1,4 @@
-'use static';
+'use strict';
 const config = require("../config/config");
 const socketIo = require('socket.io');
 const socketRedis = require('socket.io-redis');

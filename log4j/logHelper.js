@@ -8,44 +8,6 @@ var path = require("path");
 // 加载配置文件
 var objConfig = JSON.parse(fs.readFileSync("../log4j/log4j.json", "utf8"));
 
-// 检查配置文件所需的目录是否存在，不存在时创建
-/* body-parser cluster cookie-parser express fs log4js path request socket.io socket.io-redis q
-if(objConfig.appenders){
-    var baseDir = objConfig["customBaseDir"];
-    var defaultAtt = objConfig["customDefaultAtt"];
-
-    for(var i= 0, j=objConfig.appenders.length; i<j; i++){
-        var item = objConfig.appenders[i];
-        if(item["type"] == "console")
-            continue;
-
-        if(defaultAtt != null){
-            for(var att in defaultAtt){
-                if(item[att] == null)
-                    item[att] = defaultAtt[att];
-            }
-        }
-        if(baseDir != null){
-            if(item["filename"] == null)
-                item["filename"] = baseDir;
-            else
-                item["filename"] = baseDir + item["filename"];
-        }
-        var fileName = item["filename"];
-        if(fileName == null)
-            continue;
-        var pattern = item["pattern"];
-        if(pattern != null){
-            fileName += pattern;
-        }
-        var category = item["category"];
-        if(!isAbsoluteDir(fileName))//path.isAbsolute(fileName))
-            throw new Error("配置节" + category + "的路径不是绝对路径:" + fileName);
-        var dir = path.dirname(fileName);
-        checkAndCreateDir(dir);
-    }
-}
-*/
 
 // 目录创建完毕，才加载配置，不然会出异常
 log4js.configure(objConfig);
@@ -79,6 +41,12 @@ helper.error = function(msg, exp){
     if(exp != null)
         msg += "\r\n" + exp;
     logErr.error(msg);
+};
+
+helper.getLogger = function(loggerName){
+    var logger=log4js.getLogger(loggerName);
+    logger.setLevel(log4js.levels.INFO);
+    return logger;
 };
 
 // 配合express用的方法

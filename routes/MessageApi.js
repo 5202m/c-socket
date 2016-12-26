@@ -36,7 +36,7 @@ router.post('/msg', function(req, res) {
 
 router.get("/onlineCount",function(req, res){
     try{
-        let data = JSON.parse(req.body.data);
+        let data = JSON.parse(req.query.data);
         if(!data || !data.namespace || !data.room){
             res.json({code:401,msg:"参数有误!"});
             return;
@@ -54,7 +54,7 @@ router.get("/onlineCount",function(req, res){
 
 router.get("/isOnline",function(req, res){
     try{
-        let data = JSON.parse(req.body.data);
+        let data = JSON.parse(req.query.data);
         if(!data || !data.namespace || !data.uuid || !data.room){
             res.json({code:401,msg:"参数有误!"});
             return;

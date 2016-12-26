@@ -33,7 +33,7 @@ class ClientHandler{
                      }
             }},function(error, response){
                 if(error){
-                    console.error("消息通知服务层失败");
+                    console.error("消息通知服务层失败", error);
                 }else{
                     console.log("已通知服务层。。。。");
                 }

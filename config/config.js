@@ -3,13 +3,13 @@ const events = require("events");
 module.exports = {
     namespace: {
         "/studio": {
-            serverUrl:"http://192.168.35.81:3006/message"
+            serverUrl:"http://192.168.35.81:3001/message"
         },
         "/fxstudio": {
-            serverUrl:"http://192.168.35.81:3006/message"
+            serverUrl:"http://192.168.35.81:3001/message"
         },
         "/hxstudio": {
-            serverUrl:"http://192.168.35.81:3006/message"
+            serverUrl:"http://192.168.35.81:3001/message"
         }
     },
     redis: {

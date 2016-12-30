@@ -10,6 +10,9 @@ module.exports = {
         },
         "/hxstudio": {
             serverUrl:"http://192.168.35.81:3001/message"
+        },
+        "/cfstudio": {
+            serverUrl:"http://192.168.35.81:3001/message"
         }
     },
     redis: {

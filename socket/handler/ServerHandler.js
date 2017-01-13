@@ -21,9 +21,6 @@ class ServerHandler{
      */
     listen(){
         let _this = this;
-        /*config.emitter.send.on(this.getEmitterKey(),(namespace,data)=>{
-            _this.onMessage(namespace,data);
-        });*/
         this._sub.on("ready", ()=>{
             _this._sub.on("message", (channel, message)=>{
                 let data = msgpack.decode(message);
@@ -38,7 +35,7 @@ class ServerHandler{
      * @param data
      */
     onMessage(namespace,data){
-        if(data && data.msgType){
+        if(data && data.eventType){
             let result = this.messageHandler.message(namespace,data,false);
             if(result.isNeedMultiple){
                 data.namespace = namespace;

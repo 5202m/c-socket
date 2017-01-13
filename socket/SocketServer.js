@@ -13,7 +13,7 @@ class SocketServer{
         //初始化 handler
         this.handler =  require("./handler/Handler");
         this.handler.init(this.io);
-        //命名空间  //TODO 后续应改成动态获取 可动态设置
+        //命名空间  //TODO 后续应改成动态获取 提供api等    动态设置
         for(let i in config.namespace){
             this.namespaceCall(i);
         }

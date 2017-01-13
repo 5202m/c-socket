@@ -2,20 +2,40 @@
 const config=require('../../config/config');
 const msgpack = require('msgpack-js');
 const storageService = require("../../service/StorageService");
+const log = require("../../log4j/logHelper").getLogger("MessageHandler");
 /****
  * 对消息的处理，发送消息、加入房间、离开房间
  */
 class MessageHandler{
     constructor(){
-        this.msgType = new Map();
-        this.msgType.set(config.msgType.sendMsg,{fn:this.sendMsg.bind(this),isChat:true});
-        this.msgType.set(config.msgType.join,{fn:this.join.bind(this)});
-        this.msgType.set(config.msgType.leave,{fn:this.leave.bind(this)});
-        this.msgType.set(config.msgType.setUUID,{fn:this.setUUID.bind(this)});
-        this.msgType.set(config.msgType.init,{fn:this.initSocket.bind(this)});
+        this.eventTypeMap = new Map();
+        this.eventTypeMap.set(config.eventType.sendMsg,{fn:this.sendMsg.bind(this),isChat:true});
+        this.eventTypeMap.set(config.eventType.join,{fn:this.join.bind(this)});
+        this.eventTypeMap.set(config.eventType.leave,{fn:this.leave.bind(this)});
+        this.eventTypeMap.set(config.eventType.setUUID,{fn:this.setUUID.bind(this)});
+        this.eventTypeMap.set(config.eventType.onlineList,{fn:this.onlineList.bind(this)});
+        this.eventTypeMap.set(config.eventType.init,{fn:this.initSocket.bind(this)});
+        this.isSingle = false;
+        if(this.isSingle){
+            storageService.clearAll();
+        }
     }
     init(rootIo){
         this.rootIo = rootIo;
+        if(!this.isSingle){
+            //非单机模式 定时发送消息记录状态  ，并且清理已失效的socket
+            let time = storageService.heartbeatListen() / 2;
+            setInterval(()=>{
+                let namespaces =  this.rootIo.nsps;
+                for(let namespace in namespaces){
+                    if(namespace == '/'){
+                        return;
+                    }
+                    let sockets = Object.keys(this.rootIo.of(namespace).sockets);
+                    storageService.saveHeartbeatTime(namespace,sockets);
+                }
+            },time);
+        }
     }
     /****
      * 发送消息至前端
@@ -25,24 +45,24 @@ class MessageHandler{
      */
     sendMsg(io,socket,data){
         let emit = undefined;
-        let ext = data.ext;
-        if(!ext){
+        if(!data){
             return;
         }
-        if(ext.toUser){
-            if(ext.socketId){
-                emit =  io.to(io.name+"#"+ext.socketId);
-            }else if(ext.uuid){
-                emit = io.to(ext.uuid);
+        //发送给用户的消息
+        if(data.toUser){
+            if(data.toUser.socketId){
+                emit =  io.to(this._getSocketId(io.name,data.toUser.socketId));
+            }else if(data.toUser.uuid){
+                emit = io.to(data.toUser.uuid);
             }
-        }else if(ext.room){
-            emit = io.to(ext.room);
-        }else if(ext.namespace){
-            emit = io;
+        }else if(data.toRoom){
+            //发送给房间消息
+            emit = io.to(data.toRoom.room);
+        }else if(data.toNamespace){
+            emit = io.to(data.toNamespace.namespace);
         }
-        if(emit){
-            emit.emit(data.sendMsgType,...data.msgData);
-        }
+
+        emit && emit.emit(data.msgType,...data.msgData);
     }
 
     /****
@@ -52,21 +72,20 @@ class MessageHandler{
      * @param data
      */
     join(io,socket,data){
-        let ext = data.ext;
-        if(!ext || !ext.room){
+        if(!data || !data.room){
             return;
         }
-        socket.join(ext.room);
+        socket.join(data.room);
         //记录加入过的房间
         let rooms = socket.get("room");
         if(!rooms){
             rooms = [];
         }
-        rooms.push(ext.room);
+        rooms.push(data.room);
         socket.set("room",rooms);
         let uuid = socket.get("uuid");
         let user = socket.get("user");
-        storageService.joinRoom(io.name,ext.room,uuid || socket.id,user);
+        storageService.joinRoom(io.name,data.room,socket.id,user);
     }
     /****
      * 离开房间
@@ -75,21 +94,19 @@ class MessageHandler{
      * @param data
      */
     leave(io,socket,data){
-        let ext = data.ext;
-        if(!ext || !ext.room){
+        if(!data || !data.room){
             return;
         }
-        socket.leave(ext.room);
+        socket.leave(data.room);
         let rooms = socket.get("room");
         if(rooms){
-            let index = rooms.indexOf(ext.room);
+            let index = rooms.indexOf(data.room);
             if(index >=0){
                 rooms.splice(index,1);
                 socket.set("room",rooms);
             }
         }
-        let uuid = socket.get("uuid");
-        storageService.leaveRoom(io.name,ext.room,uuid || socket.id);
+        storageService.leaveRoom(io.name,data.room,socket.id);
     }
 
     /****
@@ -99,19 +116,14 @@ class MessageHandler{
      * @param data
      */
     setUUID(io,socket,data){
-        let ext = data.ext;
-        if(!ext || !ext.uuid){
+        if(!data || !data.uuid){
             return;
         }
-        let uuid = ext.uuid;
-        //已存在uuid 则不处理
-        if(this._getSocketByUUid(io,uuid)){
-           return;
-        }
-        let oldUUid = socket.get("uuid");
-        if(oldUUid){
-            socket.leave(oldUUid);
-        }
+
+        let oldUUId = socket.get("uuid");
+        oldUUId && socket.leave(oldUUId);
+
+        let uuid = data.uuid;
         socket.set("uuid",uuid);
         socket.join(uuid);
     }
@@ -122,19 +134,20 @@ class MessageHandler{
      * @param socket
      * @param data
      */
-    pushOnline(io,socket,data){
+    onlineList(io,socket,data){
         if(!data.room || !data.key){
             return;
         }
         storageService.getRoomUserList(io.name,data.room)
             .then((result)=>{
-                try{
-                    var arr = [];
-                    for(let i = 0;i<result.length;i++){
-                        arr.push(JSON.parse(result[i]));
-                    }
-                    socket.emit(data.key,arr,arr.length);
-                }catch (e){}
+                let uuid = socket.get("uuid") || socket.id;
+                let list = [...result.list];
+                if(!result.map[uuid] && socket.get("user")){
+                    list.push(socket.get("user"));
+                }
+                socket.emit(data.key,list,list.length);
+            }).catch((e)=>{
+                log.error(e);
             });
     }
 
@@ -148,26 +161,19 @@ class MessageHandler{
         if(!initData){
             return;
         }
-        let data = undefined;
-        if(initData.msgData instanceof Array){
-            data = initData.msgData[0];
-        }else{
-            data = initData.msgData;
-        }
+        let data = initData;
         if(!data){
             return;
         }
         //设置uuid，设置后续事件、断开之后事件
         if (data.uuid) {
             //设置uuid
-            this.setUUID(io, socket,{ext:{uuid:data.uuid}});
+            this.setUUID(io, socket,{uuid:data.uuid});
         }
 
-        //需要在线用户信息
-        if(data.online){
-            if(data.online.user){
-                socket.set("user",data.online.user);
-            }
+        //设置用户信息
+        if(data.user){
+            socket.set("user",data.user);
         }
 
         if(data.event){
@@ -175,19 +181,13 @@ class MessageHandler{
             if (data.event.now) {
                 for (let i = 0; i < data.event.now.length; i++) {
                     let msg = data.event.now[i].msg;
-                    let fn = this.msgType.get(msg.msgType);
-                    fn && fn.fn(io,socket,msg);
+                    let fn = this.eventTypeMap.get(msg.eventType);
+                    fn && fn.fn(io,socket,msg.ext);
                 }
             }
             //断开连接后需要
             if(data.event.disconnect){
                 socket.set("disconnect",data.event.disconnect);
-            }
-        }
-        //需要推送在线列表
-        if(data.online) {
-            if (data.online.push) {
-                this.pushOnline(io,socket,data.online.push);
             }
         }
     }
@@ -196,23 +196,18 @@ class MessageHandler{
      * 断开连接
      * @param io
      * @param socket
-     * @param data
      */
-    disconnect(io,socket,data){
+    disconnect(io,socket){
         socket.disconnect();
         let events = socket.get("disconnect");
         //执行断开后的事件
         if(events){
-            try{
-                for(let i = 0;i<events.length;i++){
-                    let msg = events[i].msg;
-                    if(msg.msgType == config.msgType.sendMsg || msg.msgType == config.msgType.leave){
-                        let fn = this.msgType.get(msg.msgType);
-                        fn && fn.fn(io,socket,msg);
-                    }
+            for(let i = 0;i<events.length;i++){
+                let data = events[i];
+                if(data.eventType == config.eventType.sendMsg || data.eventType == config.eventType.leave){
+                    let fn = this.eventType.get(data.eventType);
+                    fn && fn.fn(io,socket,data.ext);
                 }
-            }catch (e){
-                console.log(e);
             }
         }
         //清理数据。
@@ -234,51 +229,54 @@ class MessageHandler{
      */
     message(namespace,data,isFormRedis){
         if(!data || !namespace){
-            console.error("no message namespace or data");
+            log.error("no message namespace or data");
             return {};
         }
-        let fn = this.msgType.get(data.msgType);
+        let fn = this.eventTypeMap.get(data.eventType);
         if(!fn){
-            console.error("unknow message type");
+            log.error("unknow message type",data);
             return {};
         }
-        if(!isFormRedis && !fn.isChat){
-            //首次处理 则直接返回 通知使用redis消息统一处理
+        //获取socket
+        let socket = this._getSocket(namespace,data);
+        if(!isFormRedis && !fn.isChat){  //!socket &&  没有找到socket
+            // 并且不是redis消息 并且不是普通消息 则发送redis消息通知其他socket服务处理
             return {isNeedMultiple:true};
         }
-        try{
-            let namespaceIo = this.rootIo.of(namespace);
-            if(fn.isChat){
-                fn.fn(namespaceIo, namespaceIo.sockets[namespace+"#"+data.ext.socketId],data);
-            }else if(data.ext){
-                if(data.ext.socketId){
-                    let socket = namespaceIo.sockets[namespace+"#"+data.ext.socketId];//namespace"#"socketId 规则
-                    socket && fn.fn(namespaceIo,socket,data);
-                }else if(data.ext.uuid){
-                    //根据uuid获取房间
-                    let socket = this._getSocketByUUid(data.ext.uuid);
-                    socket && fn.fn(namespaceIo,socket,data);
-                }
+
+        let namespaceIo = this.rootIo.of(namespace);
+        //是普通消息  或者  找到socket  执行处理函数
+        if(fn.isChat){
+            fn.fn(namespaceIo,null,data.ext);
+        }else if(socket){
+            for(let i = 0;i<socket.length;i++){
+                fn.fn(namespaceIo,socket[i],data.ext);
             }
-        }catch (e){
-            console.log(e);
         }
         return {}
+    }
+
+    _getSocket(namespace,data){
+        let namespaceIo = this.rootIo.of(namespace);
+        let socket = null;
+        if(data.ext && data.ext.form){
+            if(data.ext.form.socketId){
+                socket = [namespaceIo.sockets[this._getSocketId(namespace,data.ext.form.socketId)]];//namespace"#"socketId 规则
+            }else if(data.ext.uuid){
+                socket = this._getSocketByUUid(namespaceIo,data.ext.form.uuid);
+            }
+        }
+        return socket;
     }
 
     _getSocketByUUid(io,uuid){
         let room = io.adapter.rooms[uuid];
         if(room){
-            for(let socketId in room.sockets){
-                return io.sockets[socketId];
-            }
+            return  room.sockets;
         }
+    }
+    _getSocketId(namespace,socketId){
+        return namespace+"#"+socketId;
     }
 }
 module.exports = new MessageHandler();
-
-
-//TODO 如果在所有服务器关闭的情况下，用户关闭页面，就会导致redis中存储信息永远不会被删除
-//1：可使用SortedSet 存储 （加入时间） 定时清理加入时间超过XX小时之前的信息
-//2：使用ttl 监听ttl过期回调 来清理房间缓存信息
-//3：setbit 方式

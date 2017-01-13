@@ -19,12 +19,12 @@ module.exports = {
         host: '192.168.35.236',
         port: 6379
     },
-    msgType: {
+    eventType: {
         join: "join",
         leave: "leave",
-        setData: "setData",
         setUUID: "setUUID",
         sendMsg: "sendMsg",
+        onlineList:"onlineList",
         init:"init"
     }
 };

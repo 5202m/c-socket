@@ -13,6 +13,7 @@ class StorageService{
         });
         //记录在线列表  订阅redis加入离开房间消息  进行存储。
         this._onlineUserMap = {};
+        this._needReset = true;
         //为防止本地记录与redis中记录有差异（网络等不可控因素），每隔一段时间重新从redis中获取新数据
         this.spaceTime = 1000*60*30;  //30分钟
         this.lastGetTime = new Date(); //最后一次获取时间
@@ -26,15 +27,15 @@ class StorageService{
                 if(!namespaceMap){
                     return;
                 }
-                let userMap = namespaceMap[data.room];
+                let userList = namespaceMap[data.room];
                 //没有对应的list 不处理 由初始化工作处理
-                if(!userMap){
+                if(!userList){
                     return;
                 }
                 if(data.join){
-                    this._addUser(userMap,data.value);
+                    this._addUser(userList,data.value);
                 }else{
-                    this._removeUser(userMap,data.socketId);
+                    this._removeUser(userList,data.socketId);
                 }
             });
         });
@@ -109,7 +110,7 @@ class StorageService{
         let deferred = Q.defer();
         let userMap = this._getUserMap(namespace,room);
         if(userMap){
-            deferred.resolve(userMap.list.length);
+            deferred.resolve(userMap.size);
             return deferred.promise;
         }
         this.redisClient.hlen(this._getRedisKey(namespace,room), (error, result) => {
@@ -132,7 +133,7 @@ class StorageService{
         let deferred = Q.defer();
         let userMap = this._getUserMap(namespace,room);
         if(userMap){
-            let user = userMap.map[socketId];
+            let user = userMap.get[socketId];
             if(user){
                 deferred.resolve(user);
                 return deferred.promise;
@@ -158,7 +159,7 @@ class StorageService{
         let deferred = Q.defer();
         let userMap = this._getUserMap(namespace,room);
         if(userMap){
-            let user = userMap.map[socketId];
+            let user = userMap.get[socketId];
             deferred.resolve(user?true:false);
             return deferred.promise;
         }
@@ -178,7 +179,7 @@ class StorageService{
      * @param room
      */
     getRoomUserList(namespace,room){
-        let deferred = Q.defer();
+       let deferred = Q.defer();
         let userMap = this._getUserMap(namespace,room);
         //存在缓存数据  并且距离上次从redis中获取时间未达到阈值 则直接从缓存中返回
         if(userMap && (new Date().getTime() - this.lastGetTime.getTime()) < this.spaceTime){
@@ -189,10 +190,9 @@ class StorageService{
                 this._onlineUserMap[namespace] = {};
             }
             if(!this._onlineUserMap[namespace][room]){
-                this._onlineUserMap[namespace][room] = {
-                    map:{},
-                    list:[]
-                }
+                this._onlineUserMap[namespace][room] = new Map();
+            }else{
+                this._onlineUserMap[namespace][room].clear();
             }
         }
         this.redisClient.hvals(this._getRedisKey(namespace,room),(error,result)=>{
@@ -200,8 +200,7 @@ class StorageService{
                 deferred.reject(error);
             }else{
                 let userMap = this._onlineUserMap[namespace][room];
-                userMap.map = {};
-                userMap.list = [];
+
                 for(let i = 0;i<result.length;i++){
                     let user = JSON.parse(result[i]);
                     this._addUser(userMap,user);
@@ -272,14 +271,10 @@ class StorageService{
      * @private
      */
     _addUser(userMap,user){
-        if(userMap.map[user.socketId]){
+        if(userMap.has[user.socketId]){
             return;
         }
-        //当前总长度
-        let length = userMap.list.length;
-        //记录索引
-        userMap.map[user.socketId] = length;
-        userMap.list.push(user);
+        userMap.set(user.socketId,user);
     }
 
     /****
@@ -289,9 +284,7 @@ class StorageService{
      * @private
      */
     _removeUser(userMap,socketId){
-        let index = userMap.map[socketId];
-        delete userMap.map[socketId];
-        index>=0 && userMap.list.splice(index,1);
+        userMap.delete(socketId);
     }
     /****
      * 清理所有缓存信息

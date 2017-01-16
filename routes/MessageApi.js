@@ -31,14 +31,12 @@ router.post('/msg', function(req, res) {
 router.get("/onlineCount",function(req, res){
     try{
         let data = JSON.parse(req.query.data);
-        console.log(data);
         if(!data || !data.namespace || !data.room){
             res.json(apiResult.result(errorMessage.code_1000));
             return;
         }
         storageService.getRoomUserCount(data.namespace,data.room)
         .then((result)=>{
-            console.log("123");
             res.json(apiResult.result(null,{count:result}));
         },(error)=>{
             res.json(apiResult.result(errorMessage.code_1001));

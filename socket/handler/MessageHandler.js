@@ -15,7 +15,7 @@ class MessageHandler{
         this.eventTypeMap.set(config.eventType.setUUID,{fn:this.setUUID.bind(this)});
         this.eventTypeMap.set(config.eventType.onlineList,{fn:this.onlineList.bind(this)});
         this.eventTypeMap.set(config.eventType.init,{fn:this.initSocket.bind(this)});
-        this.isSingle = false;
+        this.isSingle = true;
         if(this.isSingle){
             storageService.clearAll();
         }
@@ -76,6 +76,7 @@ class MessageHandler{
             return;
         }
         socket.join(data.room);
+        console.log(io.adapter.rooms[data.room].sockets);
         //记录加入过的房间
         let rooms = socket.get("room");
         if(!rooms){
@@ -140,12 +141,11 @@ class MessageHandler{
         }
         storageService.getRoomUserList(io.name,data.room)
             .then((result)=>{
-                let uuid = socket.get("uuid") || socket.id;
-                let list = [...result.list];
-                if(!result.map[uuid] && socket.get("user")){
-                    list.push(socket.get("user"));
+                let arr = [...result.values()];
+                if(!result.has(socket.id)){
+                    arr.push(socket.get("user"));
                 }
-                socket.emit(data.key,list,list.length);
+                socket.emit(data.key,arr,arr.length);
             }).catch((e)=>{
                 log.error(e);
             });
@@ -203,9 +203,9 @@ class MessageHandler{
         //执行断开后的事件
         if(events){
             for(let i = 0;i<events.length;i++){
-                let data = events[i];
+                let data = events[i].msg;
                 if(data.eventType == config.eventType.sendMsg || data.eventType == config.eventType.leave){
-                    let fn = this.eventType.get(data.eventType);
+                    let fn = this.eventTypeMap.get(data.eventType);
                     fn && fn.fn(io,socket,data.ext);
                 }
             }
@@ -216,7 +216,7 @@ class MessageHandler{
         if(rooms){
             for(let i =0;i<rooms.length;i++){
                 socket.leave(rooms[i]);
-                storageService.leaveRoom(io.name,rooms[i],uuid || socket.id);
+                storageService.leaveRoom(io.name,rooms[i],socket.id);
             }
         }
     }
@@ -250,7 +250,7 @@ class MessageHandler{
             fn.fn(namespaceIo,null,data.ext);
         }else if(socket){
             for(let i = 0;i<socket.length;i++){
-                fn.fn(namespaceIo,socket[i],data.ext);
+                socket[i] && fn.fn(namespaceIo,socket[i],data.ext);
             }
         }
         return {}

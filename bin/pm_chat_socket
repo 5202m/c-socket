@@ -3,7 +3,7 @@ const cluster = require('cluster'),
     net = require('net');
 
 //获取启动参数 端口
-const port = process.argv[2] || 4000;
+const port = process.argv[2] || 3007;
 //是否开启单机集群模式
 const isCluster = process.argv[3] || 1;
 //获取核心数

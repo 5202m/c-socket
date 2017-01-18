@@ -1,9 +1,11 @@
 {
   "name": "socket",
   "version": "1.0",
+  "description": "直播间项目通用Socket中心。",
+  "main": "app.js",
   "private": true,
   "scripts": {
-    "start": "node ./bin/socket"
+    "start": "node ./bin/pm_chat_socket"
   },
   "dependencies": {
     "body-parser": "^1.15.2",

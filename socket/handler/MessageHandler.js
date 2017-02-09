@@ -76,7 +76,6 @@ class MessageHandler{
             return;
         }
         socket.join(data.room);
-        console.log(io.adapter.rooms[data.room].sockets);
         //记录加入过的房间
         let rooms = socket.get("room");
         if(!rooms){

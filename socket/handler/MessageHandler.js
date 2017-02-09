@@ -29,7 +29,7 @@ class MessageHandler{
                 let namespaces =  this.rootIo.nsps;
                 for(let namespace in namespaces){
                     if(namespace == '/'){
-                        return;
+                        continue;
                     }
                     let sockets = Object.keys(this.rootIo.of(namespace).sockets);
                     storageService.saveHeartbeatTime(namespace,sockets);
@@ -59,9 +59,8 @@ class MessageHandler{
             //发送给房间消息
             emit = io.to(data.toRoom.room);
         }else if(data.toNamespace){
-            emit = io.to(data.toNamespace.namespace);
+            emit = io;
         }
-
         emit && emit.emit(data.msgType,...data.msgData);
     }
 

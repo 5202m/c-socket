@@ -133,7 +133,7 @@ class StorageService{
         let deferred = Q.defer();
         let userMap = this._getUserMap(namespace,room);
         if(userMap){
-            let user = userMap.get[socketId];
+            let user = userMap.get(socketId);
             if(user){
                 deferred.resolve(user);
                 return deferred.promise;
@@ -159,7 +159,7 @@ class StorageService{
         let deferred = Q.defer();
         let userMap = this._getUserMap(namespace,room);
         if(userMap){
-            let user = userMap.get[socketId];
+            let user = userMap.get(socketId);
             deferred.resolve(user?true:false);
             return deferred.promise;
         }

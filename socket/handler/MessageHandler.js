@@ -48,16 +48,17 @@ class MessageHandler{
         if(!data){
             return;
         }
+        let target = io;
         //发送给用户的消息
         if(data.toUser){
             if(data.toUser.socketId){
-                emit =  io.to(this._getSocketId(io.name,data.toUser.socketId));
+                emit =  target.in(this._getSocketId(io.name,data.toUser.socketId));
             }else if(data.toUser.uuid){
-                emit = io.to(data.toUser.uuid);
+                emit = target.in(data.toUser.uuid);
             }
         }else if(data.toRoom){
             //发送给房间消息
-            emit = io.to(data.toRoom.room);
+            emit = target.in(data.toRoom.room);
         }else if(data.toNamespace){
             emit = io;
         }

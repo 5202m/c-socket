@@ -19,7 +19,7 @@ module.exports = {
         }
     },
     redis: {
-        host: '192.168.35.236',
+        host: '192.168.35.81',
         port: 6379
     },
     eventType: {

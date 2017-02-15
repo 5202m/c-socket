@@ -13,6 +13,9 @@ module.exports = {
         },
         "/cfstudio": {
             serverUrl:"http://192.168.35.81:3001/message"
+        },
+        "/fxFinance": {  //fx财经日历
+            serverUrl:"http://192.168.35.81:3001/message"
         }
     },
     redis: {

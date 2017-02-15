@@ -1,6 +1,6 @@
 {
   "name": "socket",
-  "version": "0.0.1",
+  "version": "1.0.0",
   "description": "直播间项目通用Socket中心。",
   "main": "app.js",
   "private": true,

@@ -29,7 +29,7 @@ class MessageHandler{
                 let namespaces =  this.rootIo.nsps;
                 for(let namespace in namespaces){
                     if(namespace == '/'){
-                        return;
+                        continue;
                     }
                     let sockets = Object.keys(this.rootIo.of(namespace).sockets);
                     storageService.saveHeartbeatTime(namespace,sockets);
@@ -48,20 +48,20 @@ class MessageHandler{
         if(!data){
             return;
         }
+        let target = io;
         //发送给用户的消息
         if(data.toUser){
             if(data.toUser.socketId){
-                emit =  io.to(this._getSocketId(io.name,data.toUser.socketId));
+                emit =  target.in(this._getSocketId(io.name,data.toUser.socketId));
             }else if(data.toUser.uuid){
-                emit = io.to(data.toUser.uuid);
+                emit = target.in(data.toUser.uuid);
             }
         }else if(data.toRoom){
             //发送给房间消息
-            emit = io.to(data.toRoom.room);
+            emit = target.in(data.toRoom.room);
         }else if(data.toNamespace){
-            emit = io.to(data.toNamespace.namespace);
+            emit = io;
         }
-
         emit && emit.emit(data.msgType,...data.msgData);
     }
 
@@ -76,7 +76,6 @@ class MessageHandler{
             return;
         }
         socket.join(data.room);
-        console.log(io.adapter.rooms[data.room].sockets);
         //记录加入过的房间
         let rooms = socket.get("room");
         if(!rooms){

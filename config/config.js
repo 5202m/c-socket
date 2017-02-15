@@ -3,19 +3,19 @@ const events = require("events");
 module.exports = {
     namespace: {
         "/studio": {
-            serverUrl:"http://192.168.35.81:3001/message"
+            
         },
         "/fxstudio": {
-            serverUrl:"http://192.168.35.81:3001/message"
+            
         },
         "/hxstudio": {
-            serverUrl:"http://192.168.35.81:3001/message"
+            
         },
         "/cfstudio": {
-            serverUrl:"http://192.168.35.81:3001/message"
+            
         },
         "/fxFinance": {  //fx财经日历
-            serverUrl:"http://192.168.35.81:3001/message"
+            
         }
     },
     redis: {

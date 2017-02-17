@@ -44,23 +44,39 @@ class MessageHandler{
      * @param data
      */
     sendMsg(io,socket,data){
+        //每个socket都会有独立房间 房间名称为 namespace # socketId  (socket.io机制)
+        //每个拥有uuid的socket加入独立房间 名称为  uuid
+
+        //emit == io
         let emit = undefined;
         if(!data){
             return;
         }
-        let target = io;
+        //清空待发送的房间列表。
+        delete io.rooms;
         //发送给用户的消息
         if(data.toUser){
-            if(data.toUser.socketId){
-                emit =  target.in(this._getSocketId(io.name,data.toUser.socketId));
-            }else if(data.toUser.uuid){
-                emit = target.in(data.toUser.uuid);
+            if(data.toUser.socketId && data.toUser.socketId.trim()){
+                emit =  io.in(this._getSocketId(io.name,data.toUser.socketId.trim()));
+            }else if(data.toUser.socketId && data.toUser.uuid.trim()){
+                emit = io.in(data.toUser.uuid.trim());
             }
-        }else if(data.toRoom){
+        }else if(data.toRoom && data.toRoom.room && data.toRoom.room.trim()){
             //发送给房间消息
-            emit = target.in(data.toRoom.room);
+            emit = io.in(data.toRoom.room.trim());
         }else if(data.toNamespace){
             emit = io;
+        }
+        //发送到具体房间 当io.rooms没有填充正确的room时 会发送到所有房间 所以如果没有正确room 则直接退出
+        try{
+            if(data.toUser || data.toRoom){
+                if(!io.rooms || io.rooms.length == 0){
+                    return;
+                }
+            }
+        }catch (e){
+            log.error("sendMsg error:",e);
+            return;
         }
         emit && emit.emit(data.msgType,...data.msgData);
     }

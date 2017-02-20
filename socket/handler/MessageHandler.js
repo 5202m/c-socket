@@ -56,14 +56,14 @@ class MessageHandler{
         delete io.rooms;
         //发送给用户的消息
         if(data.toUser){
-            if(data.toUser.socketId && data.toUser.socketId.trim()){
-                emit =  io.in(this._getSocketId(io.name,data.toUser.socketId.trim()));
-            }else if(data.toUser.socketId && data.toUser.uuid.trim()){
-                emit = io.in(data.toUser.uuid.trim());
+            if(data.toUser.socketId){
+                emit =  io.in(this._getSocketId(io.name,data.toUser.socketId));
+            }else if(data.toUser.uuid){
+                emit = io.in(data.toUser.uuid);
             }
-        }else if(data.toRoom && data.toRoom.room && data.toRoom.room.trim()){
+        }else if(data.toRoom && data.toRoom.room){
             //发送给房间消息
-            emit = io.in(data.toRoom.room.trim());
+            emit = io.in(data.toRoom.room);
         }else if(data.toNamespace){
             emit = io;
         }

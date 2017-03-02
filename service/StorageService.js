@@ -1,45 +1,47 @@
 'use strict';
-const config=require('../config/config');
+const config = require('../config/config');
 const redis = require("redis");
 const Q = require("q");
 const log = require("../log4j/logHelper").getLogger("StorageService");
 const msgpack = require('msgpack-js');
-class StorageService{
-    constructor(){
-        this.redisClient = redis.createClient({host:config.redis.host, port:config.redis.port} );
-        this._pub = redis.createClient({host:config.redis.host, port:config.redis.port} );
-        this._sub = redis.createClient({host:config.redis.host, port:config.redis.port,
+class StorageService {
+    constructor() {
+        this.redisClient = redis.createClient({ host: config.redis.host, port: config.redis.port });
+        this._pub = redis.createClient({ host: config.redis.host, port: config.redis.port });
+        this._sub = redis.createClient({
+            host: config.redis.host,
+            port: config.redis.port,
             return_buffers: true
         });
         //记录在线列表  订阅redis加入离开房间消息  进行存储。
         this._onlineUserMap = {};
         this._needReset = true;
         //为防止本地记录与redis中记录有差异（网络等不可控因素），每隔一段时间重新从redis中获取新数据
-        this.spaceTime = 1000*60*30;  //30分钟
+        this.spaceTime = 1000 * 60 * 30; //30分钟
         this.lastGetTime = new Date(); //最后一次获取时间
 
         //订阅消息
-        this._sub.on("ready", ()=>{
-            this._sub.on("message", (channel, message)=>{
+        this._sub.on("ready", () => {
+            this._sub.on("message", (channel, message) => {
                 let data = msgpack.decode(message);
                 let namespaceMap = this._onlineUserMap[data.namespace];
                 //没有对应的map 不处理 由初始化工作处理
-                if(!namespaceMap){
+                if (!namespaceMap) {
                     return;
                 }
                 let userList = namespaceMap[data.room];
                 //没有对应的list 不处理 由初始化工作处理
-                if(!userList){
+                if (!userList) {
                     return;
                 }
-                if(data.join){
-                    this._addUser(userList,data.value);
-                }else{
-                    this._removeUser(userList,data.socketId);
+                if (data.join) {
+                    this._addUser(userList, data.value);
+                } else {
+                    this._removeUser(userList, data.socketId);
                 }
             });
         });
-        this._sub.subscribe(this._getRedisPubKey(), (err)=>{});
+        this._sub.subscribe(this._getRedisPubKey(), (err) => {});
     }
 
     /*****
@@ -49,25 +51,25 @@ class StorageService{
      * @param socketId
      * @param value
      */
-    joinRoom(namespace,room,socketId,value){
+    joinRoom(namespace, room, socketId, value) {
         let deferred = Q.defer();
-        let key = this._getRedisKey(namespace,room);
-        if(!value){
+        let key = this._getRedisKey(namespace, room);
+        if (!value) {
             value = {};
         }
         //记录 socketId
         value.socketId = socketId;
-        this.redisClient.hset(key,socketId,JSON.stringify(value), (error, result) => {
-            if(error){
+        this.redisClient.hset(key, socketId, JSON.stringify(value), (error, result) => {
+            if (error) {
                 deferred.reject(error);
-            }else{
+            } else {
                 deferred.resolve(result);
                 //成功加入房间后 发送redis通知
-                this._pub.publish(this._getRedisPubKey(),msgpack.encode({
-                    join:true,
-                    namespace:namespace,
-                    room:room,
-                    value:value
+                this._pub.publish(this._getRedisPubKey(), msgpack.encode({
+                    join: true,
+                    namespace: namespace,
+                    room: room,
+                    value: value
                 }));
             }
         });
@@ -80,20 +82,20 @@ class StorageService{
      * @param room
      * @param socketId
      */
-    leaveRoom(namespace,room,socketId){
+    leaveRoom(namespace, room, socketId) {
         let deferred = Q.defer();
-        let key = this._getRedisKey(namespace,room);
-        this.redisClient.hdel(key,socketId, (error, result) => {
-            if(error){
+        let key = this._getRedisKey(namespace, room);
+        this.redisClient.hdel(key, socketId, (error, result) => {
+            if (error) {
                 deferred.reject(error);
-            }else{
+            } else {
                 deferred.resolve(result);
                 //成功离开房间后 发送redis通知
-                this._pub.publish(this._getRedisPubKey(),msgpack.encode({
-                    leave:true,
-                    namespace:namespace,
-                    room:room,
-                    socketId:socketId
+                this._pub.publish(this._getRedisPubKey(), msgpack.encode({
+                    leave: true,
+                    namespace: namespace,
+                    room: room,
+                    socketId: socketId
                 }));
             }
         });
@@ -106,17 +108,19 @@ class StorageService{
      * @param room
      * @returns {*|jQuery.promise|promise|t.promise|t}
      */
-    getRoomUserCount(namespace,room){
+    getRoomUserCount(namespace, room) {
         let deferred = Q.defer();
-        let userMap = this._getUserMap(namespace,room);
-        if(userMap){
+        let userMap = this._getUserMap(namespace, room);
+        if (userMap) {
             deferred.resolve(userMap.size);
             return deferred.promise;
         }
-        this.redisClient.hlen(this._getRedisKey(namespace,room), (error, result) => {
-            if(error){
+        console.log(this._getRedisKey(namespace, room));
+        this.redisClient.hlen(this._getRedisKey(namespace, room), (error, result) => {
+            console.log(result);
+            if (error) {
                 deferred.reject(error);
-            }else{
+            } else {
                 deferred.resolve(result);
             }
         });
@@ -129,20 +133,20 @@ class StorageService{
      * @param room
      * @param socketId
      */
-    getRoomUser(namespace,room,socketId){
+    getRoomUser(namespace, room, socketId) {
         let deferred = Q.defer();
-        let userMap = this._getUserMap(namespace,room);
-        if(userMap){
+        let userMap = this._getUserMap(namespace, room);
+        if (userMap) {
             let user = userMap.get(socketId);
-            if(user){
+            if (user) {
                 deferred.resolve(user);
                 return deferred.promise;
             }
         }
-        this.redisClient.hget(this._getRedisKey(namespace,room),socketId, (error, result) => {
-            if(error){
+        this.redisClient.hget(this._getRedisKey(namespace, room), socketId, (error, result) => {
+            if (error) {
                 deferred.reject(error);
-            }else{
+            } else {
                 deferred.resolve(result);
             }
         });
@@ -155,18 +159,18 @@ class StorageService{
      * @param room
      * @param socketId
      */
-    roomExistsUser(namespace,room,socketId){
+    roomExistsUser(namespace, room, socketId) {
         let deferred = Q.defer();
-        let userMap = this._getUserMap(namespace,room);
-        if(userMap){
+        let userMap = this._getUserMap(namespace, room);
+        if (userMap) {
             let user = userMap.get(socketId);
-            deferred.resolve(user?true:false);
+            deferred.resolve(user ? true : false);
             return deferred.promise;
         }
-        this.redisClient.hexists(this._getRedisKey(namespace,room),socketId, (error, result) => {
-            if(error){
+        this.redisClient.hexists(this._getRedisKey(namespace, room), socketId, (error, result) => {
+            if (error) {
                 deferred.reject(error);
-            }else{
+            } else {
                 deferred.resolve(result == 1);
             }
         });
@@ -178,32 +182,32 @@ class StorageService{
      * @param namespace
      * @param room
      */
-    getRoomUserList(namespace,room){
-       let deferred = Q.defer();
-        let userMap = this._getUserMap(namespace,room);
+    getRoomUserList(namespace, room) {
+        let deferred = Q.defer();
+        let userMap = this._getUserMap(namespace, room);
         //存在缓存数据  并且距离上次从redis中获取时间未达到阈值 则直接从缓存中返回
-        if(userMap && (new Date().getTime() - this.lastGetTime.getTime()) < this.spaceTime){
+        if (userMap && (new Date().getTime() - this.lastGetTime.getTime()) < this.spaceTime) {
             deferred.resolve(userMap);
             return deferred.promise;
-        }else{
-            if(!this._onlineUserMap[namespace]){
+        } else {
+            if (!this._onlineUserMap[namespace]) {
                 this._onlineUserMap[namespace] = {};
             }
-            if(!this._onlineUserMap[namespace][room]){
+            if (!this._onlineUserMap[namespace][room]) {
                 this._onlineUserMap[namespace][room] = new Map();
-            }else{
+            } else {
                 this._onlineUserMap[namespace][room].clear();
             }
         }
-        this.redisClient.hvals(this._getRedisKey(namespace,room),(error,result)=>{
-            if(error){
+        this.redisClient.hvals(this._getRedisKey(namespace, room), (error, result) => {
+            if (error) {
                 deferred.reject(error);
-            }else{
+            } else {
                 let userMap = this._onlineUserMap[namespace][room];
 
-                for(let i = 0;i<result.length;i++){
+                for (let i = 0; i < result.length; i++) {
                     let user = JSON.parse(result[i]);
-                    this._addUser(userMap,user);
+                    this._addUser(userMap, user);
                 }
                 this.lastGetTime = new Date(); //最后一次获取时间
                 deferred.resolve(userMap);
@@ -219,7 +223,7 @@ class StorageService{
      * @returns {string}
      * @private
      */
-    _getRedisKey(namespace,room){
+    _getRedisKey(namespace, room) {
         return `socket_list_by_${namespace}##${room}`;
     }
 
@@ -228,7 +232,7 @@ class StorageService{
      * @returns {string}
      * @private
      */
-    _getRedisPubKey(){
+    _getRedisPubKey() {
         return "socket_publish_join_leave";
     }
 
@@ -236,7 +240,7 @@ class StorageService{
      * 返回用户心跳记录
      * @private
      */
-    _getRedisUserHeartbeat(){
+    _getRedisUserHeartbeat() {
         return `socket_user_heartbeat`;
     }
 
@@ -246,19 +250,19 @@ class StorageService{
      * @returns {string}
      * @private
      */
-    _getRedisHeartbeatLockKey(date){
-        return `socket_user_lock_${date.getDay()}_${date.getHours()}`;
-    }
-    /****
-     * 返回用户集
-     * @param namespace
-     * @param room
-     * @private
-     */
-    _getUserMap(namespace,room){
+    _getRedisHeartbeatLockKey(date) {
+            return `socket_user_lock_${date.getDay()}_${date.getHours()}`;
+        }
+        /****
+         * 返回用户集
+         * @param namespace
+         * @param room
+         * @private
+         */
+    _getUserMap(namespace, room) {
         let namespaceMap = this._onlineUserMap[namespace];
         //没有对应的map 不处理 由初始化工作处理
-        if(!namespaceMap){
+        if (!namespaceMap) {
             return;
         }
         return namespaceMap[room];
@@ -270,11 +274,11 @@ class StorageService{
      * @param user
      * @private
      */
-    _addUser(userMap,user){
-        if(userMap.has[user.socketId]){
+    _addUser(userMap, user) {
+        if (userMap.has[user.socketId]) {
             return;
         }
-        userMap.set(user.socketId,user);
+        userMap.set(user.socketId, user);
     }
 
     /****
@@ -283,18 +287,18 @@ class StorageService{
      * @param socketId
      * @private
      */
-    _removeUser(userMap,socketId){
-        userMap.delete(socketId);
-    }
-    /****
-     * 清理所有缓存信息
-     */
-    clearAll(){
+    _removeUser(userMap, socketId) {
+            userMap.delete(socketId);
+        }
+        /****
+         * 清理所有缓存信息
+         */
+    clearAll() {
         this._onlineUserMap = {};
-        this.redisClient.keys("socket_list_by_*",(error,result)=>{
-            if(error){
-                log.error("cleatAll error",error);
-            }else if(result.length>0){
+        this.redisClient.keys("socket_list_by_*", (error, result) => {
+            if (error) {
+                log.error("cleatAll error", error);
+            } else if (result.length > 0) {
                 this.redisClient.del(result);
             }
         });
@@ -305,28 +309,28 @@ class StorageService{
      * 用于处理socket无效清理redis中数据
      * 获取2个小时前在redis中无更新的记录 默认为已失效的数据
      */
-    heartbeatListen(){
-        let time = 1000*60*60*2;
-        setInterval(()=>{
+    heartbeatListen() {
+        let time = 1000 * 60 * 60 * 2;
+        setInterval(() => {
             //获取一个小时前无更新记录
             let date = new Date();
             let lockKey = this._getRedisHeartbeatLockKey(date);
-            this.redisClient.setnx(lockKey,"lock",(error,result)=>{
-               //设置成功表明当前时间并无处理
-                if(error || result != 1){
+            this.redisClient.setnx(lockKey, "lock", (error, result) => {
+                //设置成功表明当前时间并无处理
+                if (error || result != 1) {
                     return;
                 }
                 //设置过期时间
-                this.redisClient.expire(lockKey,time);
+                this.redisClient.expire(lockKey, time);
 
                 let t = date.getTime() - time;
                 //返回数据为前一段到目前为止没有心跳通知。则清理redis中数据
-                this.redisClient.zrangebyscore(this._getRedisUserHeartbeat(),"(0",t,(error,result)=>{
-                    if(error) {
+                this.redisClient.zrangebyscore(this._getRedisUserHeartbeat(), "(0", t, (error, result) => {
+                    if (error) {
                         return;
                     }
                     let data = {};
-                    for(let i = 0;i<result.length;i++) {
+                    for (let i = 0; i < result.length; i++) {
                         let key = result[i].split("##");
                         let namespace = key[0];
                         let socketId = key[1];
@@ -335,38 +339,38 @@ class StorageService{
                         }
                         data[namespace].push(socketId);
                     }
-                    for(let namespace in data){
+                    for (let namespace in data) {
                         let socketIds = data[namespace];
                         //得到当前命名空间下的所有room
-                        this.redisClient.keys(`socket_list_by_${namespace}*`,(error,result)=>{
-                            if(error){
+                        this.redisClient.keys(`socket_list_by_${namespace}*`, (error, result) => {
+                            if (error) {
                                 return;
                             }
-                            for(let j = 0;j<result.length;j++){
+                            for (let j = 0; j < result.length; j++) {
                                 let room = result[j].split("##")[1];
-                                this.redisClient.hdel(this._getRedisKey(namespace,room),...socketIds);
+                                this.redisClient.hdel(this._getRedisKey(namespace, room), ...socketIds);
                             }
                         });
                     }
                 });
             });
-        },time);
-        return  time;
+        }, time);
+        return time;
     }
 
     /*****
      * 用于保存心跳记录
      */
-    saveHeartbeatTime(namespace,socketIds){
+    saveHeartbeatTime(namespace, socketIds) {
         let max = 500;
         let saveData = [];
         let date = new Date();
-        for(let i = 0;i<socketIds.length;i++){
+        for (let i = 0; i < socketIds.length; i++) {
             let key = namespace + "##" + socketIds[i];
             saveData.push(date);
             saveData.push(key);
-            if((i>0 && i%max == 0) || i == socketIds.length - 1){
-                this.redisClient.zadd(this._getRedisUserHeartbeat(),...saveData);
+            if ((i > 0 && i % max == 0) || i == socketIds.length - 1) {
+                this.redisClient.zadd(this._getRedisUserHeartbeat(), ...saveData);
                 saveData.length = 0;
             }
         }

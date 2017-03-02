@@ -1,6 +1,7 @@
 'use strict';
 const events = require("events");
 module.exports = {
+	apiURL: "http://192.168.35.81:3000/api",
     namespace: {
         "/studio": {
             

@@ -7,13 +7,7 @@ const request = require('request');
 class ClientHandler{
     constructor(){}
     message(msgType,socket,...msgData){
-        let namespace = this._getNamespaceBySocket(socket);
-        let namespaceName = namespace.name;
-        let namespaceConfig = config.namespace[namespaceName];
-        if(!namespaceConfig) {
-            return;
-        }
-        let url = namespaceConfig.serverUrl;
+        let url = `${config.apiURL}/message`;
 
         if(!url){
             return;
@@ -21,6 +15,7 @@ class ClientHandler{
         if(msgType != 'disconnect'){ //目前只处理断开消息
             return;
         }
+        console.log(`Posting disconnect information to ${url}...`);
         request.post({
                 url: url,
                 form: {
@@ -32,7 +27,7 @@ class ClientHandler{
                 if(error){
                     console.error("消息通知服务层失败", error);
                 }else{
-                    console.log("已通知服务层。。。。");
+                    console.log("已通知服务层断开连接。。。。", JSON.stringify(response.body));
                 }
             }
         );

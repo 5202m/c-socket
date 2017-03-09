@@ -1,22 +1,25 @@
 'use strict';
 const events = require("events");
 module.exports = {
-	apiURL: "http://192.168.35.81:3000/api",
+    apiURL: "http://192.168.35.81:3000/api",
     namespace: {
         "/studio": {
-            
+
         },
         "/fxstudio": {
-            
+
         },
         "/hxstudio": {
-            
+
         },
         "/cfstudio": {
-            
+
         },
-        "/fxFinance": {  //fx财经日历
-            
+        "/fxFinance": { //fx财经日历
+
+        },
+        "/emtstudio": { //金手指
+
         }
     },
     redis: {
@@ -28,7 +31,7 @@ module.exports = {
         leave: "leave",
         setUUID: "setUUID",
         sendMsg: "sendMsg",
-        onlineList:"onlineList",
-        init:"init"
+        onlineList: "onlineList",
+        init: "init"
     }
 };

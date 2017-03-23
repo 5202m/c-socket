@@ -115,9 +115,7 @@ class StorageService {
             deferred.resolve(userMap.size);
             return deferred.promise;
         }
-        console.log(this._getRedisKey(namespace, room));
         this.redisClient.hlen(this._getRedisKey(namespace, room), (error, result) => {
-            console.log(result);
             if (error) {
                 deferred.reject(error);
             } else {

@@ -1,9 +1,11 @@
 'use strict';
 const express = require('express');
+const compression = require('compression');
 const bodyParser = require('body-parser');
 const cookieParser = require('cookie-parser');
 const logHelper = require("./log4j/logHelper");
 const app = express();
+app.use(compression());
 app.use(bodyParser.json({limit: '50mb'}));//最大传输量
 app.use(bodyParser.urlencoded({limit: "50mb", extended: true, parameterLimit:50000}));
 app.use(cookieParser());
